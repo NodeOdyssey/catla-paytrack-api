@@ -1,0 +1,9 @@
+node_modules
+.env
+logs
+todo.txt
+dist
+reset_db.sh
+db_inject.py
+re_deploy.sh
+LightSources.qml

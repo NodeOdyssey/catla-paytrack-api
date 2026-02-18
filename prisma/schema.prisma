@@ -1,0 +1,483 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Attendance {
+  ID                Int             @id @default(autoincrement())
+  empPostRankLinkId Int
+  month             Int
+  year              Int
+  daysPresent       Int
+  daysAbsent        Int
+  extraDutyFourHr   Int?
+  extraDutyEightHr  Int?
+  docAttendance     String?         @db.Text
+  createdAt         DateTime?       @default(now()) @db.DateTime(0)
+  updatedAt         DateTime?       @default(now()) @db.DateTime(0)
+  EmpPostRankLink   EmpPostRankLink @relation(fields: [empPostRankLinkId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "attendance_ibfk_1")
+  Payroll           Payroll[]
+
+  @@index([empPostRankLinkId], map: "empPostRankLinkId")
+  @@map("attendance")
+}
+
+model Employee {
+  ID                  Int                   @id @default(autoincrement())
+  empId               String?               @db.VarChar(50)
+  empName             String                @db.VarChar(255)
+  fatherName          String                @db.VarChar(255)
+  motherName          String?               @db.VarChar(255)
+  gender              String                @db.VarChar(10)
+  dob                 DateTime              @db.Date
+  phoneNum            String                @db.VarChar(15)
+  altPhoneNum         String?               @db.VarChar(15)
+  villTown            String                @db.VarChar(100)
+  postOffice          String                @db.VarChar(100)
+  policeStation       String                @db.VarChar(100)
+  district            String                @db.VarChar(100)
+  pinCode             String                @db.VarChar(10)
+  state               String                @db.VarChar(100)
+  qualification       String                @db.VarChar(100)
+  height              Decimal?              @db.Decimal(5, 2) // TODO: Check why (3,2) is not working
+  bloodGroup          String?               @db.VarChar(5)
+  idMark              String?               @db.VarChar(255)
+  bankName            String                @db.VarChar(100)
+  accNum              String?               @db.VarChar(20)
+  epfNo               String?               @db.VarChar(30)
+  esiNo               String?               @db.VarChar(30)
+  pan                 String?               @db.VarChar(10)
+  aadhaarNo           String?               @db.VarChar(14)
+  ifsc                String                @db.VarChar(11)
+  docContract         String?               @db.Text
+  docResume           String?               @db.Text
+  docPan              String?               @db.Text
+  docOther            String?               @db.Text
+  docAadhaar          String?               @db.Text
+  profilePhoto        String?               @db.Text
+  dateOfJoining       DateTime?             @db.Date
+  dateOfRejoining     DateTime?             @db.Date
+  dateOfAbsconding    DateTime?             @db.Date
+  dateOfResignation   DateTime?             @db.Date
+  dateOfDischarge     DateTime?             @db.Date
+  remarks             String?               @db.Text
+  empStatus           empStatus?
+  isDeleted           Boolean?              @default(false)
+  CreatedAt           DateTime?             @default(now()) @db.DateTime(0)
+  UpdatedAt           DateTime?             @default(now()) @db.DateTime(0)
+  DeletedAt           DateTime?             @db.DateTime(0)
+  EmployeeHistory     EmployeeHistory[]
+  EmpPostHistRankLink EmpPostHistRankLink[]
+  EmpPostRankLink     EmpPostRankLink[]
+
+  @@map("employee")
+}
+
+model EmployeeHistory {
+  ID            Int       @id @default(autoincrement())
+  empId         String    @db.VarChar(10)
+  empTableId    Int
+  empName       String    @db.VarChar(255)
+  fatherName    String    @db.VarChar(255)
+  dob           DateTime  @db.Date
+  gender        String    @db.VarChar(10)
+  height        Decimal?  @db.Decimal(3, 2)
+  idMark        String?   @db.VarChar(255)
+  profilePhoto  String?   @db.VarChar(255)
+  qualification String    @db.VarChar(100)
+  bloodGroup    String?   @db.VarChar(5)
+  applyDate     DateTime? @db.Date
+  villTown      String    @db.VarChar(100)
+  postOffice    String    @db.VarChar(100)
+  policeStation String    @db.VarChar(100)
+  district      String    @db.VarChar(100)
+  pinCode       String    @db.VarChar(10)
+  state         String    @db.VarChar(100)
+  phoneNum      String    @db.VarChar(15)
+  altPhoneNum   String?   @db.VarChar(15)
+  bankName      String    @db.VarChar(100)
+  accNum        String    @db.VarChar(20)
+  ifsc          String    @db.VarChar(11)
+  pan           String    @db.VarChar(10)
+  aadhaarNo     String    @db.VarChar(14)
+  docPan        String?   @db.VarChar(100)
+  docAadhaar    String?   @db.VarChar(100)
+  docAddProof   String?   @db.VarChar(100)
+  esiNo         String?   @db.VarChar(20)
+  uan           String?   @db.VarChar(15)
+  epfNo         String?   @db.VarChar(15)
+  dateOfJoining DateTime? @db.Date
+  CreatedAt     DateTime? @default(now()) @db.DateTime(0)
+  Reason        String?   @db.Text
+  // Employee      Employee  @relation(fields: [empTableId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "employeehistory_ibfk_1")
+  Employee      Employee  @relation(fields: [empTableId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "employeehistory_ibfk_unique")
+
+  @@index([empTableId], map: "empTableId")
+  @@map("employeehistory")
+}
+
+model EmpPostHistRankLink {
+  ID                 Int              @id @default(autoincrement())
+  empTableId         Int?
+  PostHistRankLinkID Int
+  DateOfPosting      DateTime         @db.Date
+  TransferredFrom    String?          @db.VarChar(255)
+  DateOfTransfer     DateTime?        @db.Date
+  TransferredTo      String?          @db.VarChar(255)
+  ReApplyDate        DateTime?        @db.Date
+  DateOfRehire       DateTime?        @db.Date
+  TC                 String?          @db.VarChar(255)
+  DateOfDischarge    DateTime?        @db.Date
+  Reason             String?          @db.Text
+  CreatedAt          DateTime?        @default(now()) @db.DateTime(0)
+  Employee           Employee?        @relation(fields: [empTableId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "empposthistranklink_ibfk_1")
+  PostHistRankLink   PostHistRankLink @relation(fields: [PostHistRankLinkID], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "empposthistranklink_ibfk_2")
+
+  @@index([empTableId], map: "empTableId")
+  @@index([PostHistRankLinkID], map: "PostHistRankLinkID")
+  @@map("empposthistranklink")
+}
+
+model EmpPostRankLink {
+  ID                Int          @id @default(autoincrement())
+  empTableId        Int
+  postRankLinkId    Int
+  dateOfPosting     DateTime     @db.Date
+  status            empStatus    @default(Active)
+  dateOfDischarge   DateTime?    @db.Date
+  transferredFrom   String?      @db.VarChar(255)
+  dateOfTransfer    DateTime?    @db.Date
+  transferredTo     String?      @db.VarChar(255)
+  promotedFrom      String?      @db.VarChar(255)
+  dateOfPromotion   DateTime?    @db.Date
+  promotedTo        String?      @db.VarChar(255)
+  dateOfResignation DateTime?    @db.Date
+  dateOfAbsconding  DateTime?    @db.Date
+  dateOfRejoining   DateTime?    @db.Date
+  // reApplyDate     DateTime?    @db.Date
+  // dateOfRehire    DateTime?    @db.Date
+  CreatedAt         DateTime?    @default(now()) @db.DateTime(0)
+  UpdatedAt         DateTime?    @default(now()) @db.DateTime(0)
+  Attendance        Attendance[]
+  Employee          Employee     @relation(fields: [empTableId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "emppostranklink_ibfk_1")
+  PostRankLink      PostRankLink @relation(fields: [postRankLinkId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "emppostranklink_ibfk_2")
+  Payroll           Payroll[]
+
+  @@index([empTableId], map: "empTableID_idx") // renamed index
+  @@index([postRankLinkId], map: "postRankLinkID_idx") // renamed index
+  @@map("emppostranklink")
+}
+
+// model EmpPostRankLink {
+//   ID              Int          @id @default(autoincrement())
+//   empTableId      Int
+//   postRankLinkId  Int
+//   dateOfPosting   DateTime     @db.Date
+//   transferredFrom String?      @db.VarChar(255)
+//   dateOfTransfer  DateTime?    @db.Date
+//   transferredTo   String?      @db.VarChar(255)
+//   reApplyDate     DateTime?    @db.Date
+//   dateOfRehire    DateTime?    @db.Date
+//   CreatedAt       DateTime?    @default(now()) @db.DateTime(0)
+//   UpdatedAt       DateTime?    @default(now()) @db.DateTime(0)
+//   Attendance      Attendance[]
+//   Employee        Employee     @relation(fields: [empTableId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "emppostranklink_ibfk_1")
+//   PostRankLink    PostRankLink @relation(fields: [postRankLinkId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "emppostranklink_ibfk_2")
+//   Payroll         Payroll[]
+
+//   @@index([empTableId], map: "empTableId")
+//   @@index([postRankLinkId], map: "postRankLinkId")
+// }
+
+// model Payroll {
+//   ID                         Int                      @id @default(autoincrement())
+//   empPostRankLinkId          Int
+//   postId                     Int
+//   attendanceId               Int
+//   taxDeductionPostRankLinkId Int
+//   month                      Int
+//   year                       Int
+//   bonus                      Decimal?                 @db.Decimal(10, 2)
+//   advance                    Decimal?                 @db.Decimal(10, 2)
+//   extraDuty                  Decimal?                 @db.Decimal(10, 2)
+//   beltDeduction              Decimal?                 @db.Decimal(10, 2)
+//   bootDeduction              Decimal?                 @db.Decimal(10, 2)
+//   uniformDeduction           Decimal?                 @db.Decimal(10, 2)
+//   otherDeduction             Decimal?                 @db.Decimal(10, 2)
+//   weeklyOff                  Decimal?                 @db.Decimal(10, 2)
+//   createdAt                  DateTime?                @default(now()) @db.DateTime(0)
+//   updatedAt                  DateTime?                @default(now()) @db.DateTime(0)
+//   EmpPostRankLink            EmpPostRankLink          @relation(fields: [empPostRankLinkId], references: [ID], onDelete: NoAction, onUpdate: NoAction)
+//   Attendance                 Attendance               @relation(fields: [attendanceId], references: [ID], onDelete: NoAction, onUpdate: NoAction)
+//   TaxDeductionPostRankLink   TaxDeductionPostRankLink @relation(fields: [taxDeductionPostRankLinkId], references: [ID], onDelete: NoAction, onUpdate: NoAction)
+
+//   @@index([empPostRankLinkId], map: "empPostRankLinkId")
+//   @@index([attendanceId], map: "attendanceId")
+//   @@index([taxDeductionPostRankLinkId], map: "taxDeductionPostRankLinkId")
+//   @@index([postId], map: "postId")
+// }
+
+model Payroll {
+  ID                  Int             @id @default(autoincrement())
+  empPostRankLinkId   Int
+  postId              Int
+  attendanceId        Int
+  // taxDeductionPostRankLinkId Int?         @default(0)
+  month               Int
+  year                Int
+  workingDays         Int
+  basicSalary         Decimal?        @db.Decimal(10, 2)
+  fourHourPay         Decimal?        @db.Decimal(10, 2)
+  eightHourPay        Decimal?        @db.Decimal(10, 2)
+  bonus               Decimal?        @db.Decimal(10, 2)
+  weeklyOff           Decimal?        @db.Decimal(10, 2)
+  hra                 Decimal?        @db.Decimal(10, 2)
+  conveyance          Decimal?        @db.Decimal(10, 2)
+  kitWashingAllowance Decimal?        @db.Decimal(10, 2)
+  uniformAllowance    Decimal?        @db.Decimal(10, 2)
+  cityAllowance       Decimal?        @db.Decimal(10, 2)
+  vda                 Decimal?        @db.Decimal(10, 2)
+  otherAllowance      Decimal?        @db.Decimal(10, 2)
+  specialAllowance    Decimal?        @db.Decimal(10, 2) // Newly added @19.03.25
+  grossPay            Decimal?        @db.Decimal(10, 2)
+  extraDuty           Decimal?        @db.Decimal(10, 2)
+  advance             Decimal?        @db.Decimal(10, 2)
+  esi                 Decimal?        @db.Decimal(10, 2)
+  epf                 Decimal?        @db.Decimal(10, 2)
+  beltDeduction       Decimal?        @db.Decimal(10, 2)
+  bootDeduction       Decimal?        @db.Decimal(10, 2)
+  uniformDeduction    Decimal?        @db.Decimal(10, 2)
+  otherDeduction      Decimal?        @db.Decimal(10, 2)
+  totalDeduction      Decimal?        @db.Decimal(10, 2)
+  pTax                Decimal?        @db.Decimal(10, 2)
+  netPay              Decimal?        @db.Decimal(10, 2)
+  empEsiTaxPercent    Decimal?        @db.Decimal(10, 2)
+  empEpfTaxPercent    Decimal?        @db.Decimal(10, 2)
+  emplrEsiTaxPercent  Decimal?        @db.Decimal(10, 2)
+  emplrEpfTaxPercent  Decimal?        @db.Decimal(10, 2)
+  createdAt           DateTime?       @default(now()) @db.DateTime(0)
+  updatedAt           DateTime?       @default(now()) @db.DateTime(0)
+  EmpPostRankLink     EmpPostRankLink @relation(fields: [empPostRankLinkId], references: [ID], onDelete: NoAction, onUpdate: NoAction)
+  Attendance          Attendance      @relation(fields: [attendanceId], references: [ID], onDelete: NoAction, onUpdate: NoAction)
+  // TaxDeductionPostRankLink   TaxDeductionPostRankLink? @relation(fields: [taxDeductionPostRankLinkId], references: [ID], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([empPostRankLinkId], map: "empPostRankLinkId")
+  @@index([attendanceId], map: "attendanceId")
+  // @@index([taxDeductionPostRankLinkId], map: "taxDeductionPostRankLinkId")
+  @@index([postId], map: "postId")
+  @@map("payroll")
+}
+
+enum ReportName {
+  NONE                     @map("None")
+  VIEW_DS_REPORT           @map("View DS Report")
+  ESI_REPORT               @map("ESI Report")
+  EPF_REPORT               @map("EPF Report")
+  PTAX_REPORT              @map("PTax Report")
+  WITHOUT_ALLOWANCE_REPORT @map("Without Allowance Report")
+  NEW_PAYROLL_REPORT       @map("New Payroll Report")
+  DSL_REPORT               @map("DSL Report")
+  LNT_REPORT               @map("LNT Report")
+  OTHERS_REPORT            @map("Others Report")
+  SALARY_REPORT            @map("Salary Report")
+}
+
+model Post {
+  ID              Int            @id @default(autoincrement())
+  postName        String         @unique(map: "postName") @db.VarChar(255)
+  address         String         @db.VarChar(255)
+  gstin           String         @db.VarChar(15)
+  pan             String         @db.VarChar(15)
+  contactPerson   String?        @db.VarChar(255)
+  status          status
+  serviceLocation String?        @db.VarChar(255) // TODO: Remove later as not needed
+  contractDate    DateTime?      @db.Date
+  phoneNum        String?        @db.VarChar(20)
+  docGst          String?        @db.Text
+  docPan          String?        @db.Text
+  docContract     String?        @db.Text
+  docOther        String?        @db.Text
+  createdAt       DateTime?      @default(now()) @db.DateTime(0)
+  updatedAt       DateTime?      @default(now()) @db.DateTime(0)
+  isDeleted       Boolean?       @default(false)
+  reportName      ReportName?    @default(NONE)
+  deletedAt       DateTime?      @db.DateTime(0)
+  PostHistory     PostHistory[]
+  PostRankLink    PostRankLink[]
+
+  @@map("post")
+}
+
+model PostHistory {
+  ID               Int                @id @default(autoincrement())
+  postId           Int
+  postName         String             @unique(map: "postName") @db.VarChar(255)
+  address          String             @db.VarChar(255)
+  pan              String             @db.VarChar(15)
+  gstin            String             @db.VarChar(15)
+  docGst           String?            @db.VarChar(255)
+  docPan           String?            @db.VarChar(255)
+  wef              DateTime?          @db.Date
+  wet              DateTime?          @db.Date
+  reason           String?            @db.Text
+  createdAt        DateTime?          @default(now()) @db.DateTime(0)
+  Post             Post               @relation(fields: [postId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "posthistory_ibfk_1")
+  PostHistRankLink PostHistRankLink[]
+
+  @@index([postId], map: "postId")
+  @@map("posthistory")
+}
+
+model PostHistRankLink {
+  ID                  Int                   @id @default(autoincrement())
+  postHistId          Int
+  rankId              Int
+  basicSalary         Decimal?              @db.Decimal(10, 2)
+  kitWashingAllowance Decimal?              @db.Decimal(10, 2)
+  cityAllowance       Decimal?              @db.Decimal(10, 2)
+  conveyance          Decimal?              @db.Decimal(10, 2)
+  hra                 Decimal?              @db.Decimal(10, 2)
+  vda                 Decimal?              @db.Decimal(10, 2)
+  uniformAllowance    Decimal?              @db.Decimal(10, 2)
+  reason              String?               @db.Text
+  createdAt           DateTime?             @default(now()) @db.DateTime(0)
+  EmpPostHistRankLink EmpPostHistRankLink[]
+  PostHistory         PostHistory           @relation(fields: [postHistId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "posthistranklink_ibfk_1")
+  Rank                Rank                  @relation(fields: [rankId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "posthistranklink_ibfk_2")
+
+  @@index([postHistId], map: "postHistId")
+  @@index([rankId], map: "rankId")
+  @@map("posthistranklink")
+}
+
+model PostRankLink {
+  ID                       Int                        @id @default(autoincrement())
+  postId                   Int
+  rankId                   Int
+  basicSalary              Decimal?                   @db.Decimal(10, 2)
+  kitWashingAllowance      Decimal?                   @db.Decimal(10, 2)
+  cityAllowance            Decimal?                   @db.Decimal(10, 2)
+  conveyance               Decimal?                   @db.Decimal(10, 2)
+  hra                      Decimal?                   @db.Decimal(10, 2)
+  vda                      Decimal?                   @db.Decimal(10, 2)
+  uniformAllowance         Decimal?                   @db.Decimal(10, 2)
+  otherAllowance           Decimal?                   @db.Decimal(10, 2)
+  weeklyOff                Decimal?                   @db.Decimal(10, 2) // Newly added @19.03.25
+  specialAllowance         Decimal?                   @db.Decimal(10, 2) // Newly added @19.03.25
+  taxDeducName             String?                    @db.VarChar(255)
+  createdAt                DateTime?                  @default(now()) @db.DateTime(0)
+  updatedAt                DateTime?                  @default(now()) @db.DateTime(0)
+  Post                     Post                       @relation(fields: [postId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "postranklink_ibfk_1")
+  Rank                     Rank                       @relation(fields: [rankId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "postranklink_ibfk_2")
+  EmpPostRankLink          EmpPostRankLink[]
+  TaxDeductionPostRankLink TaxDeductionPostRankLink[]
+
+  @@index([postId], map: "postId")
+  @@index([rankId], map: "rankId")
+  @@map("postranklink")
+}
+
+model Rank {
+  ID                  Int                @id @default(autoincrement())
+  designation         String             @unique(map: "designation") @db.VarChar(255)
+  basicSalary         Decimal            @db.Decimal(10, 2)
+  kitWashingAllowance Decimal?           @db.Decimal(10, 2)
+  cityAllowance       Decimal?           @db.Decimal(10, 2)
+  conveyance          Decimal?           @db.Decimal(10, 2)
+  hra                 Decimal?           @db.Decimal(10, 2)
+  vda                 Decimal?           @db.Decimal(10, 2)
+  uniformAllowance    Decimal?           @db.Decimal(10, 2)
+  otherAllowance      Decimal?           @db.Decimal(10, 2)
+  weeklyOff           Decimal?           @db.Decimal(10, 2) // Newly added @19.03.25
+  specialAllowance    Decimal?           @db.Decimal(10, 2)
+  createdAt           DateTime?          @default(now()) @db.DateTime(0)
+  updatedAt           DateTime?          @default(now()) @db.DateTime(0)
+  isDeleted           Boolean?           @default(false)
+  deletedAt           DateTime?          @db.DateTime(0)
+  PostHistRankLink    PostHistRankLink[]
+  PostRankLink        PostRankLink[]
+
+  @@map("rank")
+}
+
+model TaxesAndDeduction {
+  ID                       Int                        @id @default(autoincrement())
+  taxDeducName             String                     @unique(map: "taxDeducName") @db.VarChar(255)
+  pTax                     Decimal                    @db.Decimal(10, 2)
+  esi                      Decimal                    @db.Decimal(10, 2)
+  epf                      Decimal                    @db.Decimal(10, 2)
+  employerEpf              Decimal?                   @db.Decimal(10, 2)
+  employerEsi              Decimal?                   @db.Decimal(10, 2)
+  uniformDeduction         Decimal?                   @db.Decimal(10, 2)
+  otherDeduction           Decimal?                   @db.Decimal(10, 2)
+  createdAt                DateTime?                  @default(now()) @db.DateTime(0)
+  TaxDeductionPostRankLink TaxDeductionPostRankLink[]
+
+  @@map("taxesanddeduction")
+}
+
+model TaxDeductionPostRankLink {
+  ID                Int               @id @default(autoincrement())
+  taxDeductionID    Int
+  postRankLinkId    Int
+  createdAt         DateTime?         @default(now()) @db.DateTime(0)
+  updatedAt         DateTime?         @default(now()) @db.DateTime(0)
+  TaxesAndDeduction TaxesAndDeduction @relation(fields: [taxDeductionID], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "taxdeductionpostranklink_ibfk_1")
+  PostRankLink      PostRankLink      @relation(fields: [postRankLinkId], references: [ID], onDelete: NoAction, onUpdate: NoAction, map: "taxdeductionpostranklink_ibfk_2")
+  // Payroll           Payroll[]
+
+  @@index([taxDeductionID], map: "taxDeductionID")
+  @@index([postRankLinkId], map: "postRankLinkId")
+  @@map("taxdeductionpostranklink")
+}
+
+model TokenBlacklist {
+  ID        Int       @id @default(autoincrement())
+  token     String?   @db.Text
+  createdAt DateTime? @default(now()) @db.DateTime(0)
+
+  @@map("tokenblacklist")
+}
+
+model User {
+  ID           Int       @id @default(autoincrement())
+  name         String    @db.VarChar(255)
+  username     String    @unique(map: "username") @db.VarChar(255)
+  email        String?   @unique(map: "email") @db.VarChar(255)
+  passwordHash String    @db.VarChar(255)
+  role         userRole
+  userVerified Boolean?  @default(false)
+  profilePhoto String?   @db.VarChar(255)
+  status       status
+  createdAt    DateTime? @default(now()) @db.DateTime(0)
+  updatedAt    DateTime? @default(now()) @db.DateTime(0)
+
+  @@map("user")
+}
+
+enum userRole {
+  Admin
+  Manager
+  User
+  DevAdmin
+}
+
+enum status {
+  Active
+  Inactive
+  Deleted
+}
+
+enum empStatus {
+  Active
+  Transferred
+  Discharged
+  Absconded
+  Resigned
+  Inactive
+  Deleted
+}
