@@ -1598,6 +1598,91 @@ const getPayrollStatus = async (req: Request, res: Response) => {
   }
 };
 
+const getCurrentMonthPayrollStatusByEmployee = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  const { employeeId } = req.params;
+  const parsedEmployeeId = Number(employeeId);
+
+  if (!Number.isInteger(parsedEmployeeId) || parsedEmployeeId <= 0) {
+    return res.status(400).send({
+      status: 400,
+      success: false,
+      message: "Valid employeeId is required.",
+    });
+  }
+
+  const today = new Date();
+  const currentMonth = today.getMonth() + 1;
+  const currentYear = today.getFullYear();
+
+  try {
+    const employee = await db.employee.findUnique({
+      where: { ID: parsedEmployeeId },
+      include: {
+        EmpPostRankLink: {
+          where: { status: "Active" },
+          orderBy: { dateOfPosting: "desc" },
+          take: 1,
+          select: {
+            ID: true,
+          },
+        },
+      },
+    });
+
+    if (!employee || employee.isDeleted) {
+      return res.status(404).send({
+        status: 404,
+        success: false,
+        message: "Employee does not exist.",
+      });
+    }
+
+    const activePosting = employee.EmpPostRankLink[0];
+    if (!activePosting) {
+      return res.status(400).send({
+        status: 400,
+        success: false,
+        message:
+          "Payroll status cannot be verified because employee has no active posting.",
+      });
+    }
+
+    const payrollExists = await db.payroll.findFirst({
+      where: {
+        empPostRankLinkId: activePosting.ID,
+        month: currentMonth,
+        year: currentYear,
+      },
+      select: { ID: true },
+    });
+
+    const payrollGenerated = Boolean(payrollExists);
+    return res.status(200).send({
+      status: 200,
+      success: true,
+      payrollGenerated,
+      month: currentMonth,
+      year: currentYear,
+      message: payrollGenerated
+        ? "Payroll has already been generated for the current month. Please record salary advance directly to payroll."
+        : "Payroll is not generated for the current month. You can record salary advance.",
+    });
+  } catch (error: any) {
+    logger.error("Error while fetching current month payroll status.", error);
+    return res.status(500).send({
+      status: 500,
+      success: false,
+      message:
+        "Internal server error while fetching current month payroll status.",
+    });
+  } finally {
+    await db.$disconnect();
+  }
+};
+
 const recordAdvance = async (
   req: Request,
   res: Response,
@@ -1798,5 +1883,6 @@ export {
   updatePayroll,
   deletePayroll,
   getPayrollStatus,
+  getCurrentMonthPayrollStatusByEmployee,
   recordAdvance,
 };

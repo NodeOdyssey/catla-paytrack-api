@@ -6,6 +6,7 @@ import {
   deletePayroll,
   getPayrollStatus,
   generatePaySlipsByPost,
+  getCurrentMonthPayrollStatusByEmployee,
   recordAdvance,
 } from "../controllers/payroll.controller";
 
@@ -74,6 +75,13 @@ const payrollRoutes = (app: Application) => {
     "/paytrack/api/v1/payroll-status/:month/:year",
     [verifyToken],
     getPayrollStatus,
+  );
+
+  // API for checking current month payroll status for employee advance flow
+  app.get(
+    "/paytrack/api/v1/payrolls/advance-status/:employeeId",
+    [verifyToken],
+    getCurrentMonthPayrollStatusByEmployee,
   );
 
   // API for generating payslips by post
