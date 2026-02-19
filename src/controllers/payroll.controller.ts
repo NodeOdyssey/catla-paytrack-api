@@ -7,7 +7,70 @@ import logger from "../helpers/logger";
 // Import database
 import { db } from "../configs/db.config";
 import { calculatePTax } from "../helpers/functions";
-import { spec } from "node:test/reporters";
+
+type AdvanceDetailRecord = {
+  amount: number;
+  paidOn: string;
+  recordedAt: string;
+};
+
+class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+const toNumber = (value: any): number =>
+  typeof value?.toNumber === "function" ? value.toNumber() : Number(value ?? 0);
+
+const toRoundedCurrency = (value: number): number =>
+  Number(Number(value).toFixed(2));
+
+const isValidDate = (value: Date): boolean => !Number.isNaN(value.getTime());
+
+const isSameMonthAndYear = (
+  date: Date,
+  month: number,
+  year: number,
+): boolean => date.getMonth() + 1 === month && date.getFullYear() === year;
+
+const parseAdvanceDetails = (details: unknown): AdvanceDetailRecord[] => {
+  if (!Array.isArray(details)) {
+    return [];
+  }
+
+  return details
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const amount = toRoundedCurrency(toNumber((item as any).amount));
+      const paidOn = String((item as any).paidOn ?? "");
+      const recordedAt = String((item as any).recordedAt ?? "");
+
+      if (!amount || Number.isNaN(amount) || !paidOn || !recordedAt) {
+        return null;
+      }
+
+      const paidOnDate = new Date(paidOn);
+      const recordedAtDate = new Date(recordedAt);
+
+      if (!isValidDate(paidOnDate) || !isValidDate(recordedAtDate)) {
+        return null;
+      }
+
+      return {
+        amount,
+        paidOn: paidOnDate.toISOString(),
+        recordedAt: recordedAtDate.toISOString(),
+      };
+    })
+    .filter((item): item is AdvanceDetailRecord => item !== null);
+};
 
 // Function for creating a payroll
 const createPayroll = async (
@@ -293,7 +356,7 @@ const createPayroll = async (
         month: month,
         year: year,
         bonus: 0,
-        advance: 0,
+        advance: toNumber(empPostRank.Employee.salaryAdvance),
         extraDuty: 0,
         beltDeduction: 0,
         bootDeduction: 0,
@@ -542,8 +605,12 @@ const createPayroll = async (
       return payrollData;
     });
 
-    await db.$transaction(
-      calculatedPayrolls.map((payroll) =>
+    const employeeIdsToReset = Array.from(
+      new Set(employeePostRanks.map((record) => record.Employee.ID)),
+    );
+
+    await db.$transaction([
+      ...calculatedPayrolls.map((payroll) =>
         db.payroll.update({
           where: {
             ID: payroll.ID,
@@ -582,7 +649,17 @@ const createPayroll = async (
           },
         }),
       ),
-    );
+      ...employeeIdsToReset.map((employeeId) =>
+        db.employee.update({
+          where: { ID: employeeId },
+          data: {
+            salaryAdvance: 0,
+            noOfAdvancePayments: 0,
+            advanceDetails: [],
+          },
+        }),
+      ),
+    ]);
 
     console.log("calculatedPayrolls: ", calculatedPayrolls);
     return res.status(201).send({
@@ -1521,6 +1598,199 @@ const getPayrollStatus = async (req: Request, res: Response) => {
   }
 };
 
+const recordAdvance = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  const { employeeId, amount, advanceDate } = req.body;
+
+  const parsedEmployeeId = Number(employeeId);
+  const parsedAmount = toRoundedCurrency(Number(amount));
+  const parsedAdvanceDate = new Date(advanceDate);
+  const today = new Date();
+  const currentMonth = today.getMonth() + 1;
+  const currentYear = today.getFullYear();
+
+  if (!Number.isInteger(parsedEmployeeId) || parsedEmployeeId <= 0) {
+    return res.status(400).send({
+      status: 400,
+      success: false,
+      message: "Valid employeeId is required.",
+    });
+  }
+
+  if (!parsedAmount || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+    return res.status(400).send({
+      status: 400,
+      success: false,
+      message: "Advance amount must be greater than zero.",
+    });
+  }
+
+  if (!isValidDate(parsedAdvanceDate)) {
+    return res.status(400).send({
+      status: 400,
+      success: false,
+      message: "Invalid advance payment date.",
+    });
+  }
+
+  if (!isSameMonthAndYear(parsedAdvanceDate, currentMonth, currentYear)) {
+    return res.status(400).send({
+      status: 400,
+      success: false,
+      message:
+        "Advance payment date must be within the current month and current year.",
+    });
+  }
+
+  try {
+    const result = await db.$transaction(async (tx) => {
+      const employee = await tx.employee.findUnique({
+        where: { ID: parsedEmployeeId },
+        include: {
+          EmpPostRankLink: {
+            where: { status: "Active" },
+            orderBy: { dateOfPosting: "desc" },
+            take: 1,
+            include: {
+              PostRankLink: {
+                select: { basicSalary: true, postId: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (!employee || employee.isDeleted) {
+        throw new ApiError(404, "Employee does not exist.");
+      }
+
+      const activePosting = employee.EmpPostRankLink[0];
+
+      if (!activePosting) {
+        throw new ApiError(
+          400,
+          "Advance can be recorded only for employees with an active posting.",
+        );
+      }
+
+      const payrollExists = await tx.payroll.findFirst({
+        where: {
+          empPostRankLinkId: activePosting.ID,
+          month: currentMonth,
+          year: currentYear,
+        },
+        select: { ID: true },
+      });
+
+      if (payrollExists) {
+        throw new ApiError(
+          409,
+          "Payroll has already been generated for this employee for the current month. Record advance directly in payroll.",
+        );
+      }
+
+      const basicSalary = toRoundedCurrency(
+        toNumber(activePosting.PostRankLink.basicSalary),
+      );
+      if (!basicSalary || basicSalary <= 0) {
+        throw new ApiError(
+          400,
+          "Unable to record advance because employee basic salary is not configured.",
+        );
+      }
+
+      const existingDetails = parseAdvanceDetails(employee.advanceDetails);
+      const currentMonthDetails = existingDetails.filter((detail) => {
+        const paidOnDate = new Date(detail.paidOn);
+        return isValidDate(paidOnDate)
+          ? isSameMonthAndYear(paidOnDate, currentMonth, currentYear)
+          : false;
+      });
+
+      const monthTotalFromDetails = toRoundedCurrency(
+        currentMonthDetails.reduce((sum, detail) => sum + detail.amount, 0),
+      );
+      const monthTotalFromCounter = toRoundedCurrency(
+        toNumber(employee.salaryAdvance),
+      );
+      const currentMonthTotal =
+        monthTotalFromDetails > 0 ? monthTotalFromDetails : monthTotalFromCounter;
+      const currentMonthCount =
+        currentMonthDetails.length > 0
+          ? currentMonthDetails.length
+          : Number(employee.noOfAdvancePayments ?? 0);
+
+      const updatedMonthTotal = toRoundedCurrency(currentMonthTotal + parsedAmount);
+      if (updatedMonthTotal > basicSalary) {
+        throw new ApiError(
+          400,
+          `Advance exceeds monthly cap. Maximum allowed cumulative advance is ${basicSalary.toFixed(2)} for this employee.`,
+        );
+      }
+
+      const nowIso = new Date().toISOString();
+      const updatedDetails: AdvanceDetailRecord[] = [
+        ...currentMonthDetails,
+        {
+          amount: parsedAmount,
+          paidOn: parsedAdvanceDate.toISOString(),
+          recordedAt: nowIso,
+        },
+      ];
+
+      const updatedEmployee = await tx.employee.update({
+        where: { ID: parsedEmployeeId },
+        data: {
+          salaryAdvance: updatedMonthTotal,
+          noOfAdvancePayments: currentMonthCount + 1,
+          advanceDetails: updatedDetails,
+        },
+        select: {
+          ID: true,
+          empName: true,
+          salaryAdvance: true,
+          noOfAdvancePayments: true,
+          advanceDetails: true,
+        },
+      });
+
+      return updatedEmployee;
+    });
+
+    return res.status(200).send({
+      status: 200,
+      success: true,
+      message: `Salary advance recorded for ${result.empName}.`,
+      advance: {
+        employeeId: result.ID,
+        employeeName: result.empName,
+        salaryAdvance: toRoundedCurrency(toNumber(result.salaryAdvance)),
+        noOfAdvancePayments: Number(result.noOfAdvancePayments ?? 0),
+        advanceDetails: parseAdvanceDetails(result.advanceDetails),
+      },
+    });
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      return res.status(error.status).send({
+        status: error.status,
+        success: false,
+        message: error.message,
+      });
+    }
+
+    logger.error("Error while recording salary advance.", error);
+    return res.status(500).send({
+      status: 500,
+      success: false,
+      message: "Internal server error while recording salary advance.",
+    });
+  } finally {
+    await db.$disconnect();
+  }
+};
+
 export {
   createPayroll,
   viewPayroll,
@@ -1528,4 +1798,5 @@ export {
   updatePayroll,
   deletePayroll,
   getPayrollStatus,
+  recordAdvance,
 };

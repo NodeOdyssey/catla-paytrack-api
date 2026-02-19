@@ -65,6 +65,9 @@ model Employee {
   dateOfResignation   DateTime?             @db.Date
   dateOfDischarge     DateTime?             @db.Date
   remarks             String?               @db.Text
+  salaryAdvance       Decimal?              @default(0) @db.Decimal(10, 2)
+  noOfAdvancePayments Int?                  @default(0)
+  advanceDetails      Json?
   empStatus           empStatus?
   isDeleted           Boolean?              @default(false)
   CreatedAt           DateTime?             @default(now()) @db.DateTime(0)

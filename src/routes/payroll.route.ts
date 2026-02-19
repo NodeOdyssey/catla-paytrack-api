@@ -6,6 +6,7 @@ import {
   deletePayroll,
   getPayrollStatus,
   generatePaySlipsByPost,
+  recordAdvance,
 } from "../controllers/payroll.controller";
 
 // Import middlewares
@@ -42,6 +43,13 @@ const payrollRoutes = (app: Application) => {
       ...validateCreatePayrollRequestBody,
     ],
     createPayroll,
+  );
+
+  // API for recording salary advance before payroll generation
+  app.post(
+    "/paytrack/api/v1/payrolls/advance",
+    [verifyToken, validateNotEmptyRequestBody],
+    recordAdvance,
   );
 
   // API for getting all payrolls

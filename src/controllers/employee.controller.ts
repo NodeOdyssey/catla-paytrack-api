@@ -287,6 +287,9 @@ const getAllEmployees = async (
         profilePhoto,
         idMark,
         fatherName,
+        salaryAdvance,
+        noOfAdvancePayments,
+        advanceDetails,
       } = employee;
 
       const postRankLink = employee.EmpPostRankLink[0]?.PostRankLink;
@@ -322,6 +325,9 @@ const getAllEmployees = async (
         idMark,
         fatherName,
         bloodGroup,
+        salaryAdvance: salaryAdvance ? salaryAdvance.toNumber() : 0,
+        noOfAdvancePayments: noOfAdvancePayments ?? 0,
+        advanceDetails: Array.isArray(advanceDetails) ? advanceDetails : [],
       };
     });
 
