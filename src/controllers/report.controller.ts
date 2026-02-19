@@ -360,6 +360,7 @@ function calculateGrossPayForESIByReportType(
       };
   }
 }
+
 // Function to view DS Report
 const viewDsReport = async (req: Request, res: Response): Promise<Response> => {
   const { postId, month, year } = req.params;
@@ -372,7 +373,7 @@ const viewDsReport = async (req: Request, res: Response): Promise<Response> => {
       },
     });
 
-    if (!post) {
+    if (!post || post.isDeleted) {
       console.error("Post does not exist in the database.");
       return res.status(404).send({
         status: 404,
@@ -575,7 +576,7 @@ const viewEsiReport = async (
       },
     });
 
-    if (!post) {
+    if (!post || post.isDeleted) {
       console.error("Post does not exist in the database.");
       return res.status(404).send({
         status: 404,
@@ -730,7 +731,7 @@ const viewtWithoutAllowanceReport = async (
       },
     });
 
-    if (!post) {
+    if (!post || post.isDeleted) {
       console.error("Post does not exist in the database.");
       return res.status(404).send({
         status: 404,
@@ -903,7 +904,7 @@ const viewNewPayrollReport = async (
       },
     });
 
-    if (!post) {
+    if (!post || post.isDeleted) {
       console.error("Post does not exist in the database.");
       return res.status(404).send({
         status: 404,
@@ -1132,7 +1133,7 @@ const viewDslReport = async (
       },
     });
 
-    if (!post) {
+    if (!post || post.isDeleted) {
       console.error("Post does not exist in the database.");
       return res.status(404).send({
         status: 404,
@@ -1325,7 +1326,7 @@ const viewLntReport = async (
       },
     });
 
-    if (!post) {
+    if (!post || post.isDeleted) {
       console.error("Post does not exist in the database.");
       return res.status(404).send({
         status: 404,
@@ -1521,7 +1522,7 @@ const viewOtherReport = async (
       },
     });
 
-    if (!post) {
+    if (!post || post.isDeleted) {
       console.error("Post does not exist in the database.");
       return res.status(404).send({
         status: 404,
@@ -1728,11 +1729,21 @@ const viewEsiReportAllPost = async (
         message: "Invalid or missing post IDs.",
       });
     }
+
     // Fetch posts to map postId -> reportName
     const posts = await db.post.findMany({
-      where: { ID: { in: postIds.map((id: number) => Number(id)) } },
+      where: { ID: { in: postIds.map((id: number) => Number(id)) }, isDeleted: false },
       select: { ID: true, reportName: true },
     });
+    const allowedPostIds = posts.map((post) => post.ID);
+    if (allowedPostIds.length === 0) {
+      console.error("No valid posts found for the given criteria.");
+      return res.status(404).send({
+        status: 404,
+        success: false,
+        message: "No valid posts found for the given criteria.",
+      });
+    }
     const postReportTypeMap: Record<number, string> = {};
     posts.forEach((post) => {
       postReportTypeMap[post.ID] = post.reportName ?? "NONE";
@@ -1760,7 +1771,7 @@ const viewEsiReportAllPost = async (
         year: Number(year),
         // postId: Number(postId),
         postId: {
-          in: postIds.map((id) => Number(id)), // Ensure post IDs are numbers
+          in: allowedPostIds, // Exclude deleted posts
         },
       },
       include: {
@@ -1912,6 +1923,24 @@ const viewEpfReportAllPost = async (
       });
     }
 
+    // Exclude deleted posts
+    const validPosts = await db.post.findMany({
+      where: {
+        ID: { in: postIds.map((id: number) => Number(id)) },
+        isDeleted: false,
+      },
+      select: { ID: true },
+    });
+    const allowedPostIds = validPosts.map((p) => p.ID);
+    if (allowedPostIds.length === 0) {
+      console.warn("No valid posts found for the given criteria.");
+      return res.status(404).send({
+        status: 404,
+        success: false,
+        message: "No valid posts found for the given criteria.",
+      });
+    }
+
     // const post = await db.post.findUnique({
     //   where: {
     //     ID: Number(postId),
@@ -1934,7 +1963,7 @@ const viewEpfReportAllPost = async (
         year: Number(year),
         // postId: Number(postId),
         postId: {
-          in: postIds.map((id) => Number(id)), // Ensure post IDs are numbers
+          in: allowedPostIds, // Exclude deleted posts
         },
       },
       include: {
@@ -2100,12 +2129,22 @@ const viewSalaryReport = async (
     const posts = await db.post.findMany({
       where: {
         ID: { in: postIds.map((id: number) => Number(id)) },
+        isDeleted: false,
       },
       select: {
         ID: true,
         reportName: true,
       },
     });
+    const allowedPostIds = posts.map((post) => post.ID);
+    if (allowedPostIds.length === 0) {
+      logger.error("No valid posts found for the given criteria.");
+      return res.status(404).send({
+        status: 404,
+        success: false,
+        message: "No valid posts found for the given criteria.",
+      });
+    }
 
     // Map postId to reportName
     const postReportTypeMap: Record<number, string> = {};
@@ -2119,7 +2158,7 @@ const viewSalaryReport = async (
         month: Number(month),
         year: Number(year),
         postId: {
-          in: postIds.map((id: number) => Number(id)),
+          in: allowedPostIds,
         },
       },
       include: {
@@ -2364,13 +2403,31 @@ const viewCombinedPTaxReport = async (
       });
     }
 
+    // Exclude deleted posts
+    const validPosts = await db.post.findMany({
+      where: {
+        ID: { in: postIds.map((id: number) => Number(id)) },
+        isDeleted: false,
+      },
+      select: { ID: true },
+    });
+    const allowedPostIds = validPosts.map((p) => p.ID);
+    if (allowedPostIds.length === 0) {
+      console.warn("No valid posts found for the given criteria.");
+      return res.status(404).send({
+        status: 404,
+        success: false,
+        message: "No valid posts found for the given criteria.",
+      });
+    }
+
     // Fetch payrolls
     let payrolls = await db.payroll.findMany({
       where: {
         month: Number(month),
         year: Number(year),
         postId: {
-          in: postIds.map((id: number) => Number(id)),
+          in: allowedPostIds,
         },
       },
       include: {

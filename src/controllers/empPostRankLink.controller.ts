@@ -49,7 +49,7 @@ const createEmpPostRankLink = async (
     const postRankLink = await db.postRankLink.findUnique({
       where: { ID: parseInt(postRankLinkId) },
       include: {
-        Post: { select: { ID: true, postName: true } },
+        Post: { select: { ID: true, postName: true, isDeleted: true } },
         Rank: { select: { designation: true } },
       },
     });
@@ -60,6 +60,15 @@ const createEmpPostRankLink = async (
         status: 404,
         success: false,
         message: "Post rank link not found.",
+      });
+    }
+
+    if (postRankLink.Post.isDeleted) {
+      logger.error("Post not found.");
+      return res.status(404).send({
+        status: 404,
+        success: false,
+        message: "Post not found.",
       });
     }
 
@@ -1211,6 +1220,20 @@ const getEmployeesByPostId = async (
   }
 
   try {
+    const post = await db.post.findUnique({
+      where: { ID: parseInt(postId) },
+      select: { isDeleted: true },
+    });
+
+    if (!post || post.isDeleted) {
+      logger.error("Post not found.");
+      return res.status(404).send({
+        status: 404,
+        success: false,
+        message: "Post not found.",
+      });
+    }
+
     // Fetch PostRankLinks associated with the given postId
     const postRankLinks = await db.postRankLink.findMany({
       where: {

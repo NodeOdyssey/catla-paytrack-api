@@ -162,7 +162,7 @@ const createLinkRankToPost = async (
       where: { ID: parseInt(postId) },
     });
 
-    if (!post) {
+    if (!post || post.isDeleted) {
       logger.error("Post not found.");
       return res.status(404).send({
         status: 404,
@@ -553,7 +553,7 @@ const viewAllRanksLinkedToPost = async (
   const post = await db.post.findUnique({
     where: { ID: parseInt(postId) },
   });
-  if (!post) {
+  if (!post || post.isDeleted) {
     logger.error("Post not found.");
     return res.status(404).send({
       status: 404,

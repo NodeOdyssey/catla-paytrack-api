@@ -34,6 +34,7 @@ const createPost = async (req: Request, res: Response): Promise<Response> => {
     const existingRecord = await db.post.findFirst({
       where: {
         [field]: value,
+        isDeleted: false,
       },
     });
     return !!existingRecord;
@@ -154,7 +155,7 @@ const getPostById = async (req: Request, res: Response): Promise<Response> => {
     });
 
     // Check if the post exists
-    if (!post) {
+    if (!post || post.isDeleted) {
       logger.info(`Post with ID ${id} not found.`);
       return res.status(404).send({
         status: 404,
@@ -214,7 +215,7 @@ const updatePost = async (req: Request, res: Response): Promise<Response> => {
     where: { ID: parseInt(id) },
   });
 
-  if (!post) {
+  if (!post || post.isDeleted) {
     logger.error("Post not found.");
     return res.status(404).send({
       status: 404,
@@ -304,6 +305,47 @@ const deletePost = async (req: Request, res: Response): Promise<Response> => {
       data: { isDeleted: true, deletedAt: new Date() },
     });
 
+    // Cascade: deactivate all linked EmpPostRankLinks + update Employee statuses
+    const postRankLinks = await db.postRankLink.findMany({
+      where: { postId: parseInt(id) },
+      select: { ID: true },
+    });
+
+    const postRankLinkIds = postRankLinks.map((link) => link.ID);
+
+    if (postRankLinkIds.length > 0) {
+      // Fetch active empPostRankLinks to know impacted employees
+      const activeEmpLinks = await db.empPostRankLink.findMany({
+        where: {
+          postRankLinkId: { in: postRankLinkIds },
+          status: "Active",
+        },
+        select: { empTableId: true },
+      });
+
+      await db.empPostRankLink.updateMany({
+        where: {
+          postRankLinkId: { in: postRankLinkIds },
+          status: "Active",
+        },
+        data: {
+          status: "Inactive",
+          dateOfDischarge: new Date(),
+        },
+      });
+
+      const empTableIds = [...new Set(activeEmpLinks.map((l) => l.empTableId))];
+      if (empTableIds.length > 0) {
+        await db.employee.updateMany({
+          where: { ID: { in: empTableIds } },
+          data: {
+            empStatus: "Inactive",
+            dateOfDischarge: new Date(),
+          },
+        });
+      }
+    }
+
     logger.info(
       `Post "${post.postName.replace(/&amp;/g, "&")}" deleted successfully.`,
     );
@@ -359,7 +401,7 @@ const deactivatePost = async (
       where: { ID: parseInt(id) },
     });
 
-    if (!post) {
+    if (!post || post.isDeleted) {
       logger.error("Post not found.");
       return res.status(404).send({
         status: 404,
@@ -447,7 +489,7 @@ const reactivatePost = async (
       where: { ID: parseInt(id) },
     });
 
-    if (!post) {
+    if (!post || post.isDeleted) {
       logger.error("Post not found.");
       return res.status(404).send({
         status: 404,
@@ -535,7 +577,7 @@ const updatePostReportType = async (
       where: { ID: Number(postId) },
     });
 
-    if (!post) {
+    if (!post || post.isDeleted) {
       logger.error("Post not found.");
       return res.status(404).send({
         status: 404,

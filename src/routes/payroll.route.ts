@@ -5,6 +5,7 @@ import {
   updatePayroll,
   deletePayroll,
   getPayrollStatus,
+  generatePaySlipsByPost,
 } from "../controllers/payroll.controller";
 
 // Import middlewares
@@ -65,6 +66,13 @@ const payrollRoutes = (app: Application) => {
     "/paytrack/api/v1/payroll-status/:month/:year",
     [verifyToken],
     getPayrollStatus,
+  );
+
+  // API for generating payslips by post
+  app.get(
+    "/paytrack/api/v1/payrolls/payslips/:postId/:month/:year",
+    [verifyToken],
+    generatePaySlipsByPost,
   );
 };
 

@@ -39,7 +39,7 @@ const createPayroll = async (
     });
 
     // If post does not exist, return 404
-    if (!post) {
+    if (!post || post.isDeleted) {
       logger.error("Post does not exist in the database.");
       return res.status(404).send({
         status: 404,
@@ -615,7 +615,7 @@ const viewPayroll = async (req: Request, res: Response): Promise<Response> => {
     });
 
     // If post does not exist, return 404
-    if (!post) {
+    if (!post || post.isDeleted) {
       logger.error("Post does not exist in the database.");
       return res.status(404).send({
         status: 404,
@@ -840,6 +840,331 @@ const viewPayroll = async (req: Request, res: Response): Promise<Response> => {
       status: 500,
       success: false,
       message: "Internal server error while viewing payroll.",
+    });
+  } finally {
+    await db.$disconnect();
+  }
+};
+
+type PayslipEarningKey =
+  | "basic"
+  | "hra"
+  | "conveyance"
+  | "cityAllowance"
+  | "kitWashing"
+  | "specialAllowance"
+  | "otWages"
+  | "uniform"
+  | "vda"
+  | "others";
+
+type PayslipDeductionKey =
+  | "epf"
+  | "esi"
+  | "professionalTax"
+  | "belt"
+  | "boot"
+  | "uniform"
+  | "advance"
+  | "incomeTax"
+  | "others";
+
+const PAYSLIP_RULE_MATRIX: Record<
+  string,
+  {
+    earnings: PayslipEarningKey[];
+    deductions: PayslipDeductionKey[];
+  }
+> = {
+  VIEW_DS_REPORT: {
+    earnings: ["basic", "hra", "conveyance", "cityAllowance", "kitWashing", "otWages"],
+    deductions: [
+      "epf",
+      "esi",
+      "professionalTax",
+      "belt",
+      "boot",
+      "uniform",
+      "advance",
+      "others",
+    ],
+  },
+  WITHOUT_ALLOWANCE_REPORT: {
+    earnings: ["basic", "otWages"],
+    deductions: ["epf", "esi", "professionalTax", "advance", "others", "boot", "uniform"],
+  },
+  NEW_PAYROLL_REPORT: {
+    earnings: ["basic", "uniform", "otWages"],
+    deductions: ["epf", "esi", "professionalTax", "uniform", "advance", "others"],
+  },
+  DSL_REPORT: {
+    earnings: ["basic", "uniform", "otWages"],
+    deductions: ["epf", "esi", "professionalTax", "uniform", "advance", "others"],
+  },
+  LNT_REPORT: {
+    earnings: ["basic", "uniform", "specialAllowance", "otWages"],
+    deductions: ["epf", "esi", "professionalTax", "advance", "others"],
+  },
+  OTHERS_REPORT: {
+    earnings: ["basic", "hra", "conveyance", "cityAllowance", "kitWashing", "otWages"],
+    deductions: ["epf", "esi", "professionalTax", "advance", "others"],
+  },
+  NONE: {
+    earnings: [
+      "basic",
+      "hra",
+      "conveyance",
+      "cityAllowance",
+      "kitWashing",
+      "specialAllowance",
+      "otWages",
+      "uniform",
+      "vda",
+      "others",
+    ],
+    deductions: [
+      "epf",
+      "esi",
+      "professionalTax",
+      "belt",
+      "boot",
+      "uniform",
+      "advance",
+      "incomeTax",
+      "others",
+    ],
+  },
+};
+
+const buildFilteredComponents = (
+  allComponents: Record<string, number>,
+  allowedKeys: string[],
+) => {
+  const filtered: Record<string, number> = {};
+  let total = 0;
+
+  allowedKeys.forEach((key) => {
+    const value = allComponents[key] ?? 0;
+    filtered[key] = value;
+    total += value;
+  });
+
+  return {
+    ...filtered,
+    total: Number(total.toFixed(2)),
+  };
+};
+
+// Generate payslips for a post, month and year
+const generatePaySlipsByPost = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  const { postId, month, year } = req.params;
+
+  const parsedPostId = Number(postId);
+  const parsedMonth = Number(month);
+  const parsedYear = Number(year);
+
+  if (
+    !Number.isInteger(parsedPostId) ||
+    !Number.isInteger(parsedMonth) ||
+    !Number.isInteger(parsedYear)
+  ) {
+    return res.status(400).send({
+      status: 400,
+      success: false,
+      message: "Invalid parameters. postId, month and year must be integers.",
+    });
+  }
+
+  if (parsedMonth < 1 || parsedMonth > 12) {
+    return res.status(400).send({
+      status: 400,
+      success: false,
+      message: "Month must be an integer between 1 and 12.",
+    });
+  }
+
+  if (parsedYear < 1900 || parsedYear > 2100) {
+    return res.status(400).send({
+      status: 400,
+      success: false,
+      message: "Year must be a valid integer.",
+    });
+  }
+
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  const monthInWords = months[parsedMonth - 1];
+  const totalDaysInMonth = new Date(parsedYear, parsedMonth, 0).getDate();
+
+  const toNumber = (value: any): number =>
+    typeof value?.toNumber === "function" ? value.toNumber() : Number(value ?? 0);
+
+  const formatDate = (date: Date | null | undefined): string => {
+    if (!date) return "N/A";
+    const dayValue = date.getDate();
+    const monthValue = date.getMonth() + 1;
+    const day = dayValue < 10 ? `0${dayValue}` : String(dayValue);
+    const monthPart = monthValue < 10 ? `0${monthValue}` : String(monthValue);
+    const yearPart = date.getFullYear();
+    return `${day}/${monthPart}/${yearPart}`;
+  };
+
+  try {
+    const post = await db.post.findUnique({
+      where: {
+        ID: parsedPostId,
+      },
+    });
+
+    if (!post || post.isDeleted) {
+      return res.status(404).send({
+        status: 404,
+        success: false,
+        message: "Post does not exist in the database.",
+      });
+    }
+
+    const payrolls = await db.payroll.findMany({
+      where: {
+        postId: parsedPostId,
+        month: parsedMonth,
+        year: parsedYear,
+      },
+      include: {
+        Attendance: true,
+        EmpPostRankLink: {
+          include: {
+            Employee: true,
+            PostRankLink: {
+              include: {
+                Rank: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        EmpPostRankLink: {
+          Employee: {
+            empName: "asc",
+          },
+        },
+      },
+    });
+    
+
+    if (payrolls.length === 0) {
+      return res.status(404).send({
+        status: 404,
+        success: false,
+        message: "No payrolls found for the given criteria.",
+      });
+    }
+
+    // console.log("post.reportName: ", post.reportName);
+    // console.log("PAYSLIP_RULE_MATRIX: ", PAYSLIP_RULE_MATRIX);
+    const reportType = String(post.reportName ?? "NONE");
+    const reportRule = PAYSLIP_RULE_MATRIX[reportType] ?? PAYSLIP_RULE_MATRIX.NONE;
+    
+    // console.log("reportRule selected: ", reportRule)
+    const payslips = payrolls.map((payroll: any) => {
+      const employee = payroll.EmpPostRankLink?.Employee;
+      const rank = payroll.EmpPostRankLink?.PostRankLink?.Rank;
+      const attendance = payroll.Attendance;
+
+      const paidDays = payroll.workingDays ?? attendance?.daysPresent ?? 0;
+      const lwp = Math.max(totalDaysInMonth - paidDays, 0);
+
+      const allEarnings: Record<PayslipEarningKey, number> = {
+        basic: Math.round(toNumber(payroll.basicSalary)),
+        hra: Math.round(toNumber(payroll.hra)),
+        conveyance: Math.round(toNumber(payroll.conveyance)),
+        cityAllowance: Math.round(toNumber(payroll.cityAllowance)),
+        kitWashing: Math.round(toNumber(payroll.kitWashingAllowance)),
+        specialAllowance: Math.round(toNumber(payroll.specialAllowance)),
+        otWages: Math.round(toNumber(payroll.extraDuty)),
+        uniform: Math.round(toNumber(payroll.uniformAllowance)),
+        vda: Math.round(toNumber(payroll.vda)),
+        others: Math.round(toNumber(payroll.otherAllowance)),
+      };
+
+      const allDeductions: Record<PayslipDeductionKey, number> = {
+        epf: Math.round(toNumber(payroll.epf)),
+        // esi: toNumber(payroll.esi),
+        esi: Math.round(toNumber((payroll.empEsiTaxPercent * (Math.round(Number(payroll.basicSalary)) + Math.round(Number(payroll.extraDuty)))) / 100)),
+          // TODO: Later we need to make this dynamic based on the report type
+        professionalTax: Math.round(toNumber(payroll.pTax)),
+        belt: Math.round(toNumber(payroll.beltDeduction)),
+        boot: Math.round(toNumber(payroll.bootDeduction)),
+        uniform: Math.round(toNumber(payroll.uniformDeduction)),
+        advance: Math.round(toNumber(payroll.advance)),
+        incomeTax: 0,
+        others: Math.round(toNumber(payroll.otherDeduction)),
+      };
+
+      const earnings = buildFilteredComponents(allEarnings, reportRule.earnings);
+      const deductions = buildFilteredComponents(
+        allDeductions,
+        reportRule.deductions,
+      );
+
+      return {
+        employeeProfile: {
+          name: employee?.empName ?? "N/A",
+          id: employee?.empId ?? String(employee?.ID ?? "N/A"),
+          company: post.postName.replace(/&amp;/g, "&"),
+          designation: rank?.designation ?? "N/A",
+          doj: formatDate(payroll.EmpPostRankLink?.dateOfPosting),
+          bankName: employee?.bankName ?? "N/A",
+          accountNumber: employee?.accNum ?? "N/A",
+          esiNumber: employee?.esiNo ?? "N/A",
+          uanNumber: employee?.epfNo ?? "N/A",
+        },
+        attendance: {
+          totalDays: totalDaysInMonth,
+          paidDays,
+          lwp,
+        },
+        earnings,
+        deductions,
+      };
+    });
+
+    return res.status(200).send({
+      status: 200,
+      success: true,
+      message: "Payslips generated successfully.",
+      payslipData: {
+        month: monthInWords,
+        year: parsedYear,
+        postName: post.postName.replace(/&amp;/g, "&"),
+        postId: parsedPostId,
+        reportType,
+        payslips,
+      },
+    });
+  } catch (error: any) {
+    logger.error("Error generating payslips:", error);
+    return res.status(500).send({
+      status: 500,
+      success: false,
+      message: "Internal server error while generating payslips.",
     });
   } finally {
     await db.$disconnect();
@@ -1150,7 +1475,11 @@ const getPayrollStatus = async (req: Request, res: Response) => {
 
   try {
     // Fetch all posts
-    const posts = await db.post.findMany();
+    const posts = await db.post.findMany({
+      where: {
+        isDeleted: false,
+      },
+    });
 
     const payrollStatus = await Promise.all(
       posts.map(async (post) => {
@@ -1195,6 +1524,7 @@ const getPayrollStatus = async (req: Request, res: Response) => {
 export {
   createPayroll,
   viewPayroll,
+  generatePaySlipsByPost,
   updatePayroll,
   deletePayroll,
   getPayrollStatus,

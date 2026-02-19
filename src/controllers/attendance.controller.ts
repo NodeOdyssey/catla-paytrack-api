@@ -427,9 +427,9 @@ const createAttendanceSchedule = async (
   try {
     const post = await db.post.findUnique({
       where: { ID: parseInt(postId) },
-      select: { postName: true },
+      select: { postName: true, isDeleted: true },
     });
-    if (!post) {
+    if (!post || post.isDeleted) {
       logger.error("Post not found.");
       return res.status(404).send({
         status: 404,
@@ -1007,7 +1007,11 @@ const getAttendanceStatus = async (req: Request, res: Response) => {
 
   try {
     // Fetch all posts
-    const posts = await db.post.findMany();
+    const posts = await db.post.findMany({
+      where: {
+        isDeleted: false,
+      },
+    });
 
     const attendanceStatus = await Promise.all(
       posts.map(async (post) => {
@@ -1127,6 +1131,7 @@ const getAtendanceAndPayrollStatuses = async (req: Request, res: Response) => {
         status: {
           not: "Inactive",
         },
+        isDeleted: false,
       },
       orderBy: {
         postName: "asc",
