@@ -23,6 +23,6 @@ RUN pnpm prune --prod
 
 ENV NODE_ENV=production
 
-EXPOSE 4006
+EXPOSE 4009
 
 CMD ["node", "dist/server.js"]
