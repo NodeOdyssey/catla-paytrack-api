@@ -60,9 +60,8 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://www.purbanchalsecurity.com/paytrack, https://purbanchalsecurity.com/paytrack",
-      "https://www.purbanchalsecurity.com",
-      "https://purbanchalsecurity.com",
+      "https://www.omegapaytrack.com",
+      "https://omegapaytrack.com",
     ],
     credentials: true,
   }),
