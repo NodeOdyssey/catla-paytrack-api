@@ -23,6 +23,7 @@ import taxDeductionPostRankLinkRoutes from "./routes/taxDeducPostRankLink.route"
 import payrollRoutes from "./routes/payroll.route";
 import reportRoutes from "./routes/report.route";
 import fileUploadRoutes from "./routes/fileUploader.route";
+import invoiceRoutes from "./routes/invoice.route";
 
 // Import configs
 import { PORT } from "./configs/server.config";
@@ -87,6 +88,7 @@ taxDeductionPostRankLinkRoutes(app);
 payrollRoutes(app);
 reportRoutes(app);
 fileUploadRoutes(app);
+invoiceRoutes(app);
 
 // Health Check
 app.get("/paytrack/api/v1/health", (req, res) => {
