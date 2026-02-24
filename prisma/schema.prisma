@@ -64,6 +64,10 @@ model Employee {
   dateOfAbsconding    DateTime?             @db.Date
   dateOfResignation   DateTime?             @db.Date
   dateOfDischarge     DateTime?             @db.Date
+  idCardName          String?               @db.VarChar(255)
+  idCardIssued        Boolean?              @default(false)
+  idCardIssueDate     DateTime?             @db.Date
+  idCardExpiryDate    DateTime?             @db.Date
   remarks             String?               @db.Text
   salaryAdvance       Decimal?              @default(0) @db.Decimal(10, 2)
   noOfAdvancePayments Int?                  @default(0)

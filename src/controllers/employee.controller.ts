@@ -276,6 +276,7 @@ const getAllEmployees = async (
     });
 
     const employeeData = activeEmployees.map((employee) => {
+      const employeeWithIdCard = employee as any;
       const {
         ID,
         empId,
@@ -325,6 +326,10 @@ const getAllEmployees = async (
         idMark,
         fatherName,
         bloodGroup,
+        idCardName: employeeWithIdCard.idCardName,
+        idCardIssued: employeeWithIdCard.idCardIssued,
+        idCardIssueDate: employeeWithIdCard.idCardIssueDate,
+        idCardExpiryDate: employeeWithIdCard.idCardExpiryDate,
         salaryAdvance: salaryAdvance ? salaryAdvance.toNumber() : 0,
         noOfAdvancePayments: noOfAdvancePayments ?? 0,
         advanceDetails: Array.isArray(advanceDetails) ? advanceDetails : [],
@@ -502,6 +507,9 @@ const getEmployeeById = async (
       where: { ID: parseInt(id) },
       include: {
         EmpPostRankLink: {
+          where: { status: "Active" },
+          orderBy: { dateOfPosting: "desc" },
+          take: 1,
           include: {
             PostRankLink: {
               include: { Rank: { select: { designation: true } } },
@@ -557,6 +565,89 @@ const getEmployeeById = async (
       status: 500,
       success: false,
       message: "Internal server error while fetching employee.",
+    });
+  }
+};
+
+const updateIdCardDetails = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  const { id } = req.params;
+  const { idCardName, idCardIssueDate, idCardExpiryDate } = req.body;
+
+  if (!id || isNaN(parseInt(id))) {
+    logger.error("Invalid employee ID.");
+    return res.status(400).send({
+      status: 400,
+      success: false,
+      message: "Invalid employee ID.",
+    });
+  }
+
+  if (!idCardName || !idCardIssueDate || !idCardExpiryDate) {
+    return res.status(400).send({
+      status: 400,
+      success: false,
+      message: "idCardName, idCardIssueDate and idCardExpiryDate are required.",
+    });
+  }
+
+  try {
+    const employee = await db.employee.findUnique({
+      where: { ID: parseInt(id) },
+    });
+
+    if (!employee) {
+      return res.status(404).send({
+        status: 404,
+        success: false,
+        message: `Employee with ID ${id} not found.`,
+      });
+    }
+
+    const updatedEmployee = await (db.employee as any).update({
+      where: { ID: parseInt(id) },
+      data: {
+        idCardName,
+        idCardIssued: true,
+        idCardIssueDate: new Date(idCardIssueDate),
+        idCardExpiryDate: new Date(idCardExpiryDate),
+      },
+      include: {
+        EmpPostRankLink: {
+          where: { status: "Active" },
+          orderBy: { dateOfPosting: "desc" },
+          take: 1,
+          include: {
+            PostRankLink: {
+              include: { Rank: { select: { designation: true } } },
+            },
+          },
+        },
+      },
+    });
+
+    return res.status(200).send({
+      status: 200,
+      success: true,
+      message: "ID card details updated successfully.",
+      employee: {
+        ...updatedEmployee,
+        rank: updatedEmployee.EmpPostRankLink[0]?.PostRankLink?.Rank
+          ?.designation,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      logger.error("Error while updating id card details: ", err.message);
+    } else {
+      logger.error("Error while updating id card details: ", err);
+    }
+    return res.status(500).send({
+      status: 500,
+      success: false,
+      message: "Internal server error while updating id card details.",
     });
   }
 };
@@ -984,6 +1075,9 @@ const generateIdCard = async (
       where: { ID: parseInt(id) },
       include: {
         EmpPostRankLink: {
+          where: { status: "Active" },
+          orderBy: { dateOfPosting: "desc" },
+          take: 1,
           include: {
             PostRankLink: {
               include: { Rank: { select: { designation: true } } },
@@ -1110,6 +1204,7 @@ export {
   createEmployee,
   getAllEmployees,
   getEmployeeById,
+  updateIdCardDetails,
   updateEmployee,
   deleteEmployee,
   updateEmployeeStatus,

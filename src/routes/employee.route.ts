@@ -4,6 +4,7 @@ import {
   getAllEmployees,
   updateEmployee,
   getEmployeeById,
+  updateIdCardDetails,
   deleteEmployee,
   updateEmployeeStatus,
   viewEmployeeHistory,
@@ -32,6 +33,13 @@ const employeeRoutes = (app: Application) => {
       ...validateUpdateEmployeeRequestBody,
     ],
     updateEmployee,
+  );
+
+  // API for updating employee ID card details
+  app.patch(
+    "/paytrack/api/v1/employees/:id/id-card",
+    [verifyToken, validateNotEmptyRequestBody],
+    updateIdCardDetails,
   );
 
   // API for creating an employee
