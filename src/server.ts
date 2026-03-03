@@ -94,7 +94,7 @@ invoiceRoutes(app);
 app.get("/paytrack/api/v1/health", (req, res) => {
   res.status(200).json({
     message:
-      "::::: Welcome to PSCPL-Payroll-Server ::::: APIs are up and running. :::::",
+      "::::: Welcome to Catla-Paytrack-Server ::::: APIs are up and running. :::::",
   });
 });
 
@@ -111,7 +111,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 // console.log("PORT: ", PORT)
 // Start the server
 app.listen(Number(PORT), () => {
-  logger.info(`PSCPL Payroll Server started at PORT: ${PORT}`);
+  logger.info(`Catla Paytrack Server started at PORT: ${PORT}`);
 });
 
 // const PORT = Number(process.env.PORT) || 8086;

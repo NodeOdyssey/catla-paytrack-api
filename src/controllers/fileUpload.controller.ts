@@ -12,7 +12,7 @@ import { db } from "../configs/db.config";
 // Utility function to handle S3 operations
 const handleS3Upload = async (entityType: string, name: string) => {
   const directory = `${entityType}/${name}`;
-  const params = { Bucket: "pscpl-paytrack", Key: `${directory}/` };
+  const params = { Bucket: "catla-paytrack", Key: `${directory}/` };
 
   console.log("directory in s3 upload controller:::::::: ", directory);
   try {
@@ -35,7 +35,7 @@ const handleS3Delete = async (fileUrl: string) => {
     const key = urlParts.slice(-3).join("/"); // Get the last 3 parts: entityType/name/filename
 
     const params = {
-      Bucket: "pscpl-paytrack",
+      Bucket: "catla-paytrack",
       Key: key,
     };
 

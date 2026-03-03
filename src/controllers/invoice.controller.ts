@@ -5,12 +5,14 @@ import logger from "../helpers/logger";
 import { calculatePTax } from "../helpers/functions";
 
 const DEFAULT_GST_RATE = 18;
-const INVOICE_ATTENDANCE_MODES = ["DERIVE_ATTENDANCE", "FULL_ATTENDANCE"] as const;
+const INVOICE_ATTENDANCE_MODES = [
+  "DERIVE_ATTENDANCE",
+  "FULL_ATTENDANCE",
+] as const;
 
 const SELLER_INFO = {
-  name: "Purbanchal Security Consultants Pvt. Ltd.",
-  address:
-    "59, JB Lane, Nabagraha Road, Krishna Nagar, Silphukuri, Guwahati, Assam, 781003",
+  name: "Catla Broadband Services",
+  address: "Jayanagar Rd, Jaya Nagar, Khanapara, Guwahati, Assam - 781022",
   gstin: "",
   pan: "",
 };
@@ -21,7 +23,9 @@ type PayrollWithLinks = Awaited<
   ReturnType<typeof getPayrollRowsForInvoice>
 >[number];
 
-const toNumber = (value: { toNumber: () => number } | number | null | undefined) => {
+const toNumber = (
+  value: { toNumber: () => number } | number | null | undefined,
+) => {
   if (value === null || value === undefined) return 0;
   if (typeof value === "number") return value;
   return value.toNumber();
@@ -47,7 +51,11 @@ const parseMonthYear = (monthRaw: string, yearRaw: string) => {
   return { month, year };
 };
 
-const getPayrollRowsForInvoice = async (postId: number, month: number, year: number) => {
+const getPayrollRowsForInvoice = async (
+  postId: number,
+  month: number,
+  year: number,
+) => {
   return db.payroll.findMany({
     where: {
       postId,
@@ -163,7 +171,10 @@ const generateInvoiceNumber = async (month: number, year: number) => {
   return `${prefix}${String(sequence).padStart(3, "0")}`;
 };
 
-const getInvoiceStats = async (req: Request, res: Response): Promise<Response> => {
+const getInvoiceStats = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
   const { postId: postIdRaw, month: monthRaw, year: yearRaw } = req.params;
   const postId = Number(postIdRaw);
 
@@ -228,7 +239,9 @@ const getInvoiceStats = async (req: Request, res: Response): Promise<Response> =
 
     const fullAttendanceTaxableValue = round2(
       payrollRows.reduce(
-        (sum, payroll) => sum + calculateFullAttendanceNet(payroll, month, year).billedNetAmount,
+        (sum, payroll) =>
+          sum +
+          calculateFullAttendanceNet(payroll, month, year).billedNetAmount,
         0,
       ),
     );
@@ -272,7 +285,10 @@ const getInvoiceStats = async (req: Request, res: Response): Promise<Response> =
   }
 };
 
-const generateInvoice = async (req: Request, res: Response): Promise<Response> => {
+const generateInvoice = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
   const {
     postId: postIdRaw,
     month: monthRaw,
@@ -331,7 +347,9 @@ const generateInvoice = async (req: Request, res: Response): Promise<Response> =
     });
   }
 
-  const parsedInvoiceDate = invoiceDateRaw ? new Date(invoiceDateRaw) : new Date();
+  const parsedInvoiceDate = invoiceDateRaw
+    ? new Date(invoiceDateRaw)
+    : new Date();
   if (Number.isNaN(parsedInvoiceDate.getTime())) {
     return res.status(400).send({
       status: 400,
@@ -387,7 +405,11 @@ const generateInvoice = async (req: Request, res: Response): Promise<Response> =
       const rank = payroll.EmpPostRankLink?.PostRankLink?.Rank;
 
       if (attendanceMode === "FULL_ATTENDANCE") {
-        const fullAttendanceResult = calculateFullAttendanceNet(payroll, month, year);
+        const fullAttendanceResult = calculateFullAttendanceNet(
+          payroll,
+          month,
+          year,
+        );
         return {
           employeeId: Number(employee?.ID ?? 0),
           employeeName: employee?.empName ?? "N/A",
@@ -492,7 +514,10 @@ const generateInvoice = async (req: Request, res: Response): Promise<Response> =
   }
 };
 
-const getInvoiceById = async (req: Request, res: Response): Promise<Response> => {
+const getInvoiceById = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
   const invoiceId = Number(req.params.invoiceId);
 
   if (!Number.isInteger(invoiceId) || invoiceId <= 0) {
